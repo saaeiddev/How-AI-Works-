@@ -6,10 +6,25 @@
     <meta name="theme-color" content="#7c3cff" />
     <meta name="description" content="How AI Works — an interactive 3D museum of artificial intelligence." />
     <title>HOW AI WORKS — Interactive 3D AI Lab</title>
+    <style>
+      @keyframes emergencyBootExit {
+        0%, 88% { opacity: 1; visibility: visible; }
+        100% { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+      #loading.loading-screen:not(.is-hidden) {
+        animation: emergencyBootExit 3s ease forwards;
+      }
+    </style>
   </head>
   <body>
     <div id="app" aria-live="polite"></div>
     <noscript>This interactive AI lab requires JavaScript.</noscript>
     <script type="module" src="/src/main.js"></script>
+    <script>
+      window.setTimeout(function () {
+        var loading = document.getElementById('loading');
+        if (loading) loading.classList.add('is-hidden');
+      }, 3000);
+    </script>
   </body>
 </html>
