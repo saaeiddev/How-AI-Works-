@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 const LABELS = {
   home: {
     en: ['AI GUIDE','NEURAL CORE','INTERACTIVE 3D MASCOT'],
@@ -85,33 +87,41 @@ const LABELS = {
   }
 };
 
-const POSITIONS = [
-  {left:'51%',top:'28%',side:'left'},
-  {left:'66%',top:'43%',side:'right'},
-  {left:'47%',top:'61%',side:'left'},
-  {left:'70%',top:'68%',side:'right'},
-  {left:'58%',top:'77%',side:'left'}
+const LESSON_ORDER = [
+  'introduction','artificial-neuron','neural-network','training','training-data',
+  'machine-learning','deep-learning','model-training','tokens','embeddings',
+  'llm','transformer','attention','prompt','generation','generative-ai',
+  'computer-vision','image-generation','hallucinations','ai-pipeline'
 ];
 
 const style = document.createElement('style');
 style.textContent = `
   #modelLabels{position:fixed;inset:0;z-index:8;pointer-events:none;overflow:hidden}
-  .model-label{position:absolute;display:flex;align-items:center;gap:9px;transform:translate(-50%,-50%);filter:drop-shadow(0 12px 22px rgba(0,0,0,.4));animation:labelFloat 3.4s ease-in-out infinite;white-space:nowrap}
-  .model-label:nth-child(2){animation-delay:-.8s}.model-label:nth-child(3){animation-delay:-1.7s}.model-label:nth-child(4){animation-delay:-2.3s}.model-label:nth-child(5){animation-delay:-1.1s}
-  .model-label .pin{width:9px;height:9px;border-radius:50%;background:#48efff;box-shadow:0 0 0 4px rgba(72,239,255,.12),0 0 22px rgba(72,239,255,.95);flex:none}
-  .model-label .line{width:42px;height:1px;background:linear-gradient(90deg,rgba(72,239,255,.9),rgba(121,92,255,.22));box-shadow:0 0 9px rgba(72,239,255,.45)}
-  .model-label .tag{padding:8px 11px;border:1px solid rgba(151,232,255,.22);border-radius:10px;background:linear-gradient(135deg,rgba(9,26,49,.82),rgba(29,20,56,.68));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#eafaff;font:700 10px/1.1 Inter,system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;box-shadow:inset 0 1px rgba(255,255,255,.08)}
-  html[lang=fa] .model-label .tag{font-family:Vazirmatn,Inter,sans-serif;letter-spacing:0;text-transform:none;font-size:11px}
-  .model-label.right{flex-direction:row-reverse}.model-label.right .line{background:linear-gradient(270deg,rgba(72,239,255,.9),rgba(121,92,255,.22))}
-  .model-label:after{content:'';position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 11px #48efff;left:4px;top:50%}
-  @keyframes labelFloat{0%,100%{margin-top:0}50%{margin-top:-6px}}
-  @media(max-width:700px){.model-label .line{width:20px}.model-label .tag{font-size:8px;padding:6px 8px}.model-label:nth-child(n+4){display:none}#modelLabels{z-index:9}.model-label:nth-child(1){left:55%!important;top:27%!important}.model-label:nth-child(2){left:70%!important;top:39%!important}.model-label:nth-child(3){left:57%!important;top:54%!important}}
+  #modelLabels svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .label-wire{stroke:url(#labelGradient);stroke-width:1.2;opacity:.82;filter:drop-shadow(0 0 5px rgba(72,239,255,.55))}
+  .label-pin{position:absolute;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:#48efff;border:2px solid rgba(255,255,255,.92);box-shadow:0 0 0 5px rgba(72,239,255,.13),0 0 18px rgba(72,239,255,.95)}
+  .label-pin:after{content:'';position:absolute;inset:-8px;border:1px solid rgba(72,239,255,.32);border-radius:50%;animation:pinPulse 1.8s ease-out infinite}
+  .model-tag{position:absolute;transform:translate(-50%,-50%);padding:8px 11px;border:1px solid rgba(151,232,255,.24);border-radius:10px;background:linear-gradient(135deg,rgba(9,26,49,.9),rgba(29,20,56,.82));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#eafaff;font:700 10px/1.15 Inter,system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;box-shadow:0 10px 28px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.09)}
+  .model-tag:before{content:'';display:inline-block;width:5px;height:5px;margin-inline-end:7px;border-radius:50%;background:#48efff;box-shadow:0 0 9px #48efff;vertical-align:1px}
+  html[lang=fa] .model-tag{font-family:Vazirmatn,Inter,sans-serif;letter-spacing:0;text-transform:none;font-size:11px}
+  @keyframes pinPulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1.55);opacity:0}}
+  @media(max-width:700px){.model-tag{font-size:8px;padding:6px 8px}.model-label-extra{display:none}}
 `;
 document.head.appendChild(style);
 
 const layer = document.createElement('div');
 layer.id = 'modelLabels';
+layer.innerHTML = `<svg aria-hidden="true"><defs><linearGradient id="labelGradient"><stop offset="0" stop-color="#48efff"/><stop offset="1" stop-color="#7657ff"/></linearGradient></defs><g id="labelLines"></g></svg><div id="labelPins"></div><div id="labelTags"></div>`;
 document.body.appendChild(layer);
+
+const linesGroup = layer.querySelector('#labelLines');
+const pinsRoot = layer.querySelector('#labelPins');
+const tagsRoot = layer.querySelector('#labelTags');
+
+let activeScene = null;
+let activeCamera = null;
+let activeRenderer = null;
+let labelEntries = [];
 
 function currentSlug(){
   const raw = location.hash.replace(/^#\/?/,'');
@@ -122,17 +132,202 @@ function currentLang(){
   return document.documentElement.lang === 'fa' ? 'fa' : 'en';
 }
 
-function renderLabels(){
+function directGroups(scene){
+  return scene ? scene.children.filter((o)=>o && o.isGroup) : [];
+}
+
+function worldCenter(object){
+  if (!object) return null;
+  if (object.isMesh || object.isLine || object.isPoints) {
+    const box = new THREE.Box3().setFromObject(object);
+    if (!box.isEmpty()) return box.getCenter(new THREE.Vector3());
+  }
+  return object.getWorldPosition(new THREE.Vector3());
+}
+
+function averageObjects(objects){
+  const valid = objects.filter(Boolean);
+  if (!valid.length) return null;
+  const out = new THREE.Vector3();
+  let count = 0;
+  valid.forEach((obj)=>{
+    const p = worldCenter(obj);
+    if (p) { out.add(p); count += 1; }
+  });
+  return count ? out.multiplyScalar(1 / count) : null;
+}
+
+function homeAnchor(index){
+  const groups = directGroups(activeScene);
+  const robot = groups[1] || groups[0];
+  if (!robot) return null;
+  const children = robot.children || [];
+  if (index === 0) return worldCenter(children[3] || robot); // head
+  if (index === 1) return worldCenter(children[2] || children[1] || robot); // glowing core
+  return worldCenter(children[0] || robot); // body shell
+}
+
+function lessonAnchor(slug, index, count){
+  const groups = directGroups(activeScene);
+  const viz = groups[0];
+  if (!viz) return null;
+
+  const lessonIndex = LESSON_ORDER.indexOf(slug);
+  const mode = lessonIndex >= 0 ? lessonIndex % 5 : 0;
+  const meshes = viz.children.filter((o)=>o && o.isMesh);
+
+  if (!meshes.length) return worldCenter(viz);
+
+  // Radial scenes: center node + real outer nodes. Each label is tied to an actual sphere.
+  if (mode === 0) {
+    if (count === 3) {
+      const map = [1, 0, Math.min(meshes.length - 1, 5)];
+      return worldCenter(meshes[map[index] ?? 0]);
+    }
+    const spread = [1, 0, 3, 6, 7];
+    return worldCenter(meshes[spread[index] ?? Math.min(index, meshes.length - 1)]);
+  }
+
+  // Layered scenes: labels point to the physical nodes that form each actual layer.
+  if (mode === 1) {
+    const ranges = [[0,4],[4,10],[10,15],[15,18]];
+    const range = ranges[Math.min(index, ranges.length - 1)];
+    return averageObjects(meshes.slice(range[0], range[1]));
+  }
+
+  // Grid/block scenes: each educational stage is anchored to a visible block cluster.
+  if (mode === 2) {
+    const groupsByStage = count >= 4
+      ? [[0,1,6,7],[2,3,8,9],[10,11,14,15],[4,5,16,17]]
+      : [[0,1,6,7],[8,9,10,11],[16,17]];
+    const ids = groupsByStage[Math.min(index, groupsByStage.length - 1)] || [0];
+    return averageObjects(ids.map((id)=>meshes[id]));
+  }
+
+  // Ring scenes: project a real point on each torus surface, not the empty center.
+  if (mode === 3) {
+    const mesh = meshes[Math.min(index, meshes.length - 1)];
+    if (!mesh) return worldCenter(viz);
+    const radius = mesh.geometry?.parameters?.radius || 0.6;
+    const angle = (index / Math.max(1, count)) * Math.PI * 2;
+    const local = new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+    return mesh.localToWorld(local);
+  }
+
+  // Particle/cloud scenes: select distinct visible particles so every label has a concrete target.
+  const ids = [2, 9, 16, 23, 27];
+  return worldCenter(meshes[ids[index] ?? Math.min(index, meshes.length - 1)]);
+}
+
+function project(world){
+  if (!world || !activeCamera || !activeRenderer) return null;
+  const rect = activeRenderer.domElement.getBoundingClientRect();
+  const v = world.clone().project(activeCamera);
+  if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || v.z < -1 || v.z > 1) return null;
+  return {
+    x: rect.left + (v.x + 1) * 0.5 * rect.width,
+    y: rect.top + (1 - v.y) * 0.5 * rect.height,
+    visible: v.z >= -1 && v.z <= 1
+  };
+}
+
+function makeEntry(text, index, total){
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('class','label-wire');
+  linesGroup.appendChild(line);
+
+  const pin = document.createElement('span');
+  pin.className = `label-pin ${index > 2 ? 'model-label-extra' : ''}`;
+  pinsRoot.appendChild(pin);
+
+  const tag = document.createElement('span');
+  tag.className = `model-tag ${index > 2 ? 'model-label-extra' : ''}`;
+  tag.textContent = text;
+  tagsRoot.appendChild(tag);
+
+  return { line, pin, tag, index, total };
+}
+
+function rebuildLabels(){
+  linesGroup.replaceChildren();
+  pinsRoot.replaceChildren();
+  tagsRoot.replaceChildren();
+  labelEntries = [];
+
   const slug = currentSlug();
   const lang = currentLang();
   const labels = (LABELS[slug] || LABELS.home)[lang] || [];
-  layer.innerHTML = labels.map((text,i)=>{
-    const p=POSITIONS[i%POSITIONS.length];
-    return `<div class="model-label ${p.side}" style="left:${p.left};top:${p.top}"><span class="pin"></span><span class="line"></span><span class="tag">${text}</span></div>`;
-  }).join('');
+  labels.forEach((text,index)=>labelEntries.push(makeEntry(text,index,labels.length)));
 }
 
-window.addEventListener('hashchange',()=>requestAnimationFrame(renderLabels));
-new MutationObserver(()=>requestAnimationFrame(renderLabels)).observe(document.documentElement,{attributes:true,attributeFilter:['lang','dir']});
+function placeLabels(){
+  if (!activeScene || !activeCamera || !activeRenderer || !labelEntries.length) return;
+  const slug = currentSlug();
+  const mobile = window.innerWidth <= 700;
 
-renderLabels();
+  labelEntries.forEach((entry)=>{
+    const world = slug === 'home'
+      ? homeAnchor(entry.index)
+      : lessonAnchor(slug, entry.index, entry.total);
+    const p = project(world);
+    const display = !!p && p.visible && (!mobile || entry.index < 3);
+
+    entry.pin.style.display = display ? '' : 'none';
+    entry.tag.style.display = display ? '' : 'none';
+    entry.line.style.display = display ? '' : 'none';
+    if (!display) return;
+
+    const rightSide = p.x < window.innerWidth * 0.68;
+    const horizontal = mobile ? 72 : 118;
+    const verticalPattern = [-34, 30, -22, 38, 0];
+    let tx = p.x + (rightSide ? horizontal : -horizontal);
+    let ty = p.y + verticalPattern[entry.index % verticalPattern.length];
+
+    const halfTag = mobile ? 58 : 82;
+    tx = Math.max(halfTag + 8, Math.min(window.innerWidth - halfTag - 8, tx));
+    ty = Math.max(88, Math.min(window.innerHeight - 44, ty));
+
+    entry.pin.style.left = `${p.x}px`;
+    entry.pin.style.top = `${p.y}px`;
+    entry.tag.style.left = `${tx}px`;
+    entry.tag.style.top = `${ty}px`;
+
+    const endX = tx + (rightSide ? -42 : 42);
+    entry.line.setAttribute('x1', p.x.toFixed(1));
+    entry.line.setAttribute('y1', p.y.toFixed(1));
+    entry.line.setAttribute('x2', endX.toFixed(1));
+    entry.line.setAttribute('y2', ty.toFixed(1));
+  });
+}
+
+// Capture the actual scene and camera used by the app. The annotation system then
+// projects real 3D object positions into screen space on every rendered frame.
+if (!THREE.WebGLRenderer.prototype.__aiLabelsWrapped) {
+  const originalRender = THREE.WebGLRenderer.prototype.render;
+  THREE.WebGLRenderer.prototype.render = function(scene, camera){
+    activeScene = scene;
+    activeCamera = camera;
+    activeRenderer = this;
+    placeLabels();
+    return originalRender.call(this, scene, camera);
+  };
+  THREE.WebGLRenderer.prototype.__aiLabelsWrapped = true;
+}
+
+window.addEventListener('hashchange',()=>{
+  requestAnimationFrame(()=>{
+    rebuildLabels();
+    placeLabels();
+  });
+});
+
+window.addEventListener('resize',()=>requestAnimationFrame(placeLabels));
+
+new MutationObserver(()=>{
+  requestAnimationFrame(()=>{
+    rebuildLabels();
+    placeLabels();
+  });
+}).observe(document.documentElement,{attributes:true,attributeFilter:['lang','dir']});
+
+rebuildLabels();
