@@ -1,6 +1,5 @@
 import './styles.css';
 import { AIWorld } from './three/World.js';
-import './three/RobotUpgrade.js';
 import { AppUI } from './ui/AppUI.js';
 import { lessons } from './data/lessons.js';
 
@@ -39,12 +38,11 @@ function hideLoader() {
   loader?.classList.add('is-hidden');
 }
 
-// Hard failsafe: the loading overlay must never trap the user forever.
-const loadingFailsafe = window.setTimeout(hideLoader, 2400);
+const loadingFailsafe = window.setTimeout(hideLoader, 2200);
 
 const loadingMessages = [
   'Connecting neural pathways',
-  'Calibrating NOVA AI guide',
+  'Calibrating AI guide',
   'Loading immersive AI Lab'
 ];
 let messageIndex = 0;
@@ -146,10 +144,9 @@ Promise.resolve(world?.ready)
       if (fallback) fallback.hidden = false;
     }
 
-    window.setTimeout(hideLoader, 260);
+    window.setTimeout(hideLoader, 220);
   });
 
-// If something unexpected happens after boot, do not leave the loading overlay visible.
 window.addEventListener('error', () => window.setTimeout(hideLoader, 100));
 window.addEventListener('unhandledrejection', () => window.setTimeout(hideLoader, 100));
 window.addEventListener('beforeunload', () => world?.dispose());
