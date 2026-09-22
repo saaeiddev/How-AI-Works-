@@ -70,6 +70,7 @@ const stage=document.querySelector('#stage');
 const uiRoot=document.querySelector('#ui');
 const annotationLayer=document.querySelector('#annotationLayer');
 const fallback=document.querySelector('#fallback');
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const drawer=document.querySelector('#drawer');if(drawer?.classList.contains('open'))document.querySelector('#closeDrawer')?.click();}});
 
 const c=k=>copy[lang][k];
 const titleOf=l=>l.title[lang];
@@ -84,21 +85,26 @@ function detailText(l){
 function renderUI(){
   uiRoot.innerHTML=`
     <header class="topbar glass">
-      <button class="brand" id="homeBtn"><span class="brand-orb"></span><b>HOW AI WORKS</b></button>
+      <button class="brand" id="homeBtn" aria-label="How AI Works — Home"><span class="brand-orb"></span><b>HOW AI WORKS</b></button>
       <div class="journey"><span>${c('journey')}</span><strong>${progress.size}/20</strong><i><em style="width:${progress.size/20*100}%"></em></i></div>
-      <div class="top-actions"><div class="language-switch"><button data-lang="en" class="${lang==='en'?'active':''}">EN</button><button data-lang="fa" class="${lang==='fa'?'active':''}">فا</button></div><button class="icon-btn" id="menuBtn">☰</button></div>
+      <div class="top-actions"><div class="language-switch"><button data-lang="en" class="${lang==='en'?'active':''}">EN</button><button data-lang="fa" class="${lang==='fa'?'active':''}">فا</button></div><button class="icon-btn" id="menuBtn" aria-label="${c('map')}" aria-controls="drawer" aria-expanded="false">☰</button></div>
     </header>
-    <aside class="lesson-drawer glass" id="drawer"><div class="drawer-head"><div><p class="eyebrow">EXPLORE</p><h2>${c('map')}</h2></div><button class="icon-btn" id="closeDrawer">×</button></div><div id="lessonList" class="lesson-list"></div></aside>
+    <button class="drawer-backdrop" id="drawerBackdrop" aria-label="Close lessons menu" tabindex="-1"></button>
+    <aside class="lesson-drawer glass" id="drawer" role="dialog" aria-modal="true" aria-label="${c('map')}"><div class="drawer-head"><div><p class="eyebrow">EXPLORE</p><h2>${c('map')}</h2></div><button class="icon-btn" id="closeDrawer" aria-label="Close lessons menu">×</button></div><div id="lessonList" class="lesson-list"></div></aside>
     <section class="home-ui" ${current>=0?'hidden':''}><div class="hero-copy"><p class="eyebrow pill">${c('museum')}</p><h1>${c('hero')}</h1><p>${c('desc')}</p><button class="primary" id="enterBtn">${c('enter')}</button><div class="hero-meta"><span>20 interactive lessons</span><span>Anchored 3D labels</span><span>English / فارسی</span></div></div><div class="robot-hint glass"><span class="pulse-dot"></span><b>${c('click')}</b><small>${c('ready')}</small></div></section>
     <section class="lesson-ui" ${current<0?'hidden':''}>
       <div class="lesson-heading glass"><p class="eyebrow" id="lessonCategory"></p><h1 id="lessonTitle"></h1><p id="lessonBasic"></p><div class="level-tabs"><button data-level="basic" class="${level==='basic'?'active':''}">${c('basic')}</button><button data-level="details" class="${level==='details'?'active':''}">${c('details')}</button><button data-level="advanced" class="${level==='advanced'?'active':''}">${c('advanced')}</button></div></div>
       <div class="guide-panel glass" id="guidePanel"><div class="guide-kicker">${c('guide')}</div><h3 id="guideTitle">${c('labels')}</h3><p id="guideText">${c('guideHint')}</p></div>
-      <nav class="lesson-nav glass"><button id="prevBtn">← <span>${c('previous')}</span></button><button id="completeBtn" class="complete-btn"></button><button id="nextBtn"><span>${c('next')}</span> →</button></nav>
+      <nav class="lesson-nav glass" aria-label="Lesson navigation"><button id="prevBtn" aria-label="${c('previous')}">← <span>${c('previous')}</span></button><button id="completeBtn" class="complete-btn"></button><button id="nextBtn" aria-label="${c('next')}"><span>${c('next')}</span> →</button></nav>
     </section>`;
 
   const drawer=document.querySelector('#drawer');
-  document.querySelector('#menuBtn').onclick=()=>drawer.classList.add('open');
-  document.querySelector('#closeDrawer').onclick=()=>drawer.classList.remove('open');
+  const menuBtn=document.querySelector('#menuBtn');
+  drawer.inert=true;
+  const closeMenu=()=>{drawer.classList.remove('open');drawer.inert=true;menuBtn.setAttribute('aria-expanded','false');menuBtn.focus({preventScroll:true});};
+  menuBtn.onclick=()=>{drawer.classList.add('open');drawer.inert=false;menuBtn.setAttribute('aria-expanded','true');document.querySelector('#closeDrawer').focus({preventScroll:true});};
+  document.querySelector('#closeDrawer').onclick=closeMenu;
+  document.querySelector('#drawerBackdrop').onclick=closeMenu;
   document.querySelector('#homeBtn').onclick=showHome;
   document.querySelector('#enterBtn')?.addEventListener('click',()=>openLesson(0));
   document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;localStorage.setItem('how-ai-works-language',lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';renderUI();if(current>=0){updateLessonUI();refreshAnnotationContent();}else buildHomeScene();});
@@ -111,7 +117,7 @@ function renderLessonList(){
   const list=document.querySelector('#lessonList');
   if(!list)return;
   const cats=[...new Set(lessons.map(l=>l.category))];
-  list.innerHTML=cats.map(cat=>`<div class="lesson-group"><p>${lang==='fa'?(categoryFA[cat]||cat):cat}</p>${lessons.filter(l=>l.category===cat).map(l=>`<button class="lesson-link" data-index="${l.number-1}"><span>${String(l.number).padStart(2,'0')}</span><b>${titleOf(l)}</b><i>${progress.has(l.slug)?'✓':'→'}</i></button>`).join('')}</div>`).join('');
+  list.innerHTML=cats.map(cat=>`<div class="lesson-group"><p>${lang==='fa'?(categoryFA[cat]||cat):cat}</p>${lessons.filter(l=>l.category===cat).map(l=>`<button class="lesson-link ${current===l.number-1?'selected':''}" data-index="${l.number-1}"><span>${String(l.number).padStart(2,'0')}</span><b>${titleOf(l)}</b><i>${progress.has(l.slug)?'✓':'→'}</i></button>`).join('')}</div>`).join('');
   list.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{document.querySelector('#drawer').classList.remove('open');openLesson(Number(b.dataset.index));});
 }
 
@@ -167,7 +173,7 @@ function init3D(){
 }
 
 function onResize(){if(!camera||!renderer)return;camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);layoutSceneForViewport();}
-function layoutSceneForViewport(){if(!vizGroup)return;const mobile=innerWidth<720;vizGroup.scale.setScalar(mobile?.76:1);vizGroup.position.set(mobile?0:-.2,mobile?-.55:0,0);if(controls){controls.target.set(mobile?0:.6,mobile?-.25:0,0);controls.update();}}
+function layoutSceneForViewport(){if(!vizGroup)return;const mobile=innerWidth<720;vizGroup.scale.setScalar(mobile?.76:1);vizGroup.position.set(mobile?0:-.2,mobile?-.55:0,0);if(robot&&current<0){robot.position.x=mobile?0:2;robot.scale.setScalar(mobile?.85:1.18);}if(controls){controls.target.set(mobile?0:.6,mobile?-.25:0,0);controls.update();}}
 function material(color,emissive=0){return new THREE.MeshStandardMaterial({color,roughness:.24,metalness:.48,emissive:emissive?color:0x000000,emissiveIntensity:emissive});}
 function glow(color){return new THREE.MeshBasicMaterial({color,transparent:true,opacity:.82});}
 
